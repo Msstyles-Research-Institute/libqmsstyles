@@ -47,10 +47,14 @@ public:
     bool contains(IDENTIFIER nameID, bool fallback = true);
     Property *get(IDENTIFIER nameID, bool fallback = true);
     void add(Property *property);
-    void setFallback(QSharedPointer<PropertiesHandler> fallback);
+    void setFirstFallback(QSharedPointer<PropertiesHandler> firstFallback);
+    void setSecondFallback(QSharedPointer<PropertiesHandler> secondFallback);
+    void setThirdFallback(QSharedPointer<PropertiesHandler> thirdFallback);
 
 private:
-    QSharedPointer<PropertiesHandler> m_fallback;
+    QSharedPointer<PropertiesHandler> m_firstFallback;
+    QSharedPointer<PropertiesHandler> m_secondFallback;
+    QSharedPointer<PropertiesHandler> m_thirdFallback;
     QList<Property *> m_properties;
 };
 

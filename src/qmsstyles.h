@@ -22,7 +22,14 @@ class QMSSTYLES_EXPORT Qmsstyles : public QObject
 public:
     static Qmsstyles *self();
 
-    Q_INVOKABLE QSharedPointer<VisualStyle::Style> load(const QString &path, const bool fakeStructure = false);
+    /*
+     * Enabling readonly will make it so that only the parts and states with properties in them get loaded.
+     * If the clients using this mode want to get properties through the inheritance system, they will have
+     * to use VisualStyle::Style::getProperty instead of getting properties directly from a state.
+     * And obviously, this disables msstyles saving.
+     * Enabled by default.
+     */
+    Q_INVOKABLE QSharedPointer<VisualStyle::Style> load(const QString &path, const bool readonly = true);
     Q_INVOKABLE void unload(const QString &path);
     Q_INVOKABLE void unload(QSharedPointer<VisualStyle::Style> style);
 

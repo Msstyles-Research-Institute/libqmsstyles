@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(libqmsstyles VERSION 2.1.3 LANGUAGES CXX)
+project(libqmsstyles VERSION 2.2.0 LANGUAGES CXX)
 
 set(QT_MIN_VERSION "6.10.0")
 set(QT_MAJOR_VERSION 6)
@@ -20,7 +20,9 @@ include(GNUInstallDirs)
 include(FeatureSummary)
 
 find_package(LibWres REQUIRED)
-find_package(Qt${QT_MAJOR_VERSION} REQUIRED COMPONENTS Core Quick Widgets)
+find_package(Qt${QT_MAJOR_VERSION} ${QT_MIN_VERSION} REQUIRED COMPONENTS
+    Core Quick Widgets
+)
 
 feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)
 

@@ -34,3 +34,5 @@ void State::addProperty(Property *property)
 }
 
 }
+
+#include "moc_state.cpp"

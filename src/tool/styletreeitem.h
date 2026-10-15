@@ -7,11 +7,12 @@
 class StyleTreeItem
 {
 public:
-    StyleTreeItem(int id, QString name, int row, StyleTreeItem *parent);
+    StyleTreeItem(int id, QString name, QString baseName, int row, StyleTreeItem *parent);
     ~StyleTreeItem();
 
     int id() const;
     QString name() const;
+    QString baseName() const;
 
     int row() const;
     StyleTreeItem *parent() const;
@@ -24,6 +25,7 @@ public:
 private:
     int m_id;
     QString m_name;
+    QString m_baseName;
 
     int m_row;
     StyleTreeItem *m_parent;

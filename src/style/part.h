@@ -2,8 +2,8 @@
 #define QMSSTYLESPART_H
 
 #include <QObject>
-
 #include <QMap>
+#include <QList>
 
 namespace VisualStyle
 {
@@ -18,7 +18,6 @@ class Part : public QObject
     Q_PROPERTY(QString name READ name)
     Q_PROPERTY(int id READ id)
     Q_PROPERTY(QList<State *> states READ states)
-
 public:
     Part(int id, QString name);
 

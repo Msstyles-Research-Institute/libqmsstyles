@@ -1,10 +1,11 @@
 #include "styletreeitem.h"
 #include <cstdio>
 
-StyleTreeItem::StyleTreeItem(int id, QString name, int row, StyleTreeItem *parent)
+StyleTreeItem::StyleTreeItem(int id, QString name, QString baseName, int row, StyleTreeItem *parent)
     : m_parent(parent)
     , m_row(row)
     , m_name(name)
+    , m_baseName(baseName)
     , m_id(id)
 {
 }
@@ -22,6 +23,11 @@ int StyleTreeItem::id() const
 QString StyleTreeItem::name() const
 {
     return m_name;
+}
+
+QString StyleTreeItem::baseName() const
+{
+    return m_baseName;
 }
 
 int StyleTreeItem::row() const

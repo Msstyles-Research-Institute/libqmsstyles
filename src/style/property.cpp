@@ -51,7 +51,8 @@ int Property::resourceId() const
 // PropertiesHandler
 PropertiesHandler::PropertiesHandler(QObject *parent)
     : QObject(parent)
-    , m_fallback(nullptr)
+    , m_firstFallback(nullptr)
+    , m_secondFallback(nullptr)
 {
 }
 
@@ -60,7 +61,7 @@ QList<Property *> PropertiesHandler::internalList() const
     return m_properties;
 }
 
-bool PropertiesHandler::contains(IDENTIFIER nameID, bool fallback )
+bool PropertiesHandler::contains(IDENTIFIER nameID, bool fallback)
 {
     auto *prop = get(nameID, fallback);
     return !!prop;
@@ -74,11 +75,20 @@ Property *PropertiesHandler::get(IDENTIFIER nameID, bool fallback)
 
     if (it != m_properties.end()) {
         return *it;
-    } else if (m_fallback && fallback) {
-        return m_fallback->get(nameID);
-    } else {
-        return nullptr;
+    } else if (fallback) {
+        if (m_firstFallback && m_firstFallback->contains(nameID)) {
+            // States set in Common Properties
+            return m_firstFallback->get(nameID);
+        } else if (m_secondFallback && m_secondFallback->contains(nameID)) {
+            // Common Properties in the same part
+            return m_secondFallback->get(nameID);
+        } else if (m_thirdFallback && m_thirdFallback->contains(nameID)) {
+            // State in a different class
+            return m_thirdFallback->get(nameID);
+        }
     }
+
+    return nullptr;
 }
 
 void PropertiesHandler::add(Property *property)
@@ -87,10 +97,24 @@ void PropertiesHandler::add(Property *property)
     m_properties.append(property);
 }
 
-void PropertiesHandler::setFallback(QSharedPointer<PropertiesHandler> fallback)
+void PropertiesHandler::setFirstFallback(QSharedPointer<PropertiesHandler> firstFallback)
 {
-    Q_ASSERT(fallback.data() != this);
-    m_fallback = fallback;
+    Q_ASSERT(firstFallback.data() != this);
+    m_firstFallback = firstFallback;
+}
+
+void PropertiesHandler::setSecondFallback(QSharedPointer<PropertiesHandler> secondFallback)
+{
+    Q_ASSERT(secondFallback.data() != this);
+    m_secondFallback = secondFallback;
+}
+
+void PropertiesHandler::setThirdFallback(QSharedPointer<PropertiesHandler> thirdFallback)
+{
+    Q_ASSERT(thirdFallback.data() != this);
+    m_thirdFallback = thirdFallback;
 }
 
 }
+
+#include "moc_property.cpp"

@@ -2,6 +2,8 @@
 
 #include "part.h"
 
+#include <QDebug>
+
 namespace VisualStyle
 {
 
@@ -40,13 +42,13 @@ bool Class::hasPart(int partID) const
 
 Part *Class::getPart(int partID, bool fallback) const
 {
-    if (!hasPart(partID) && fallback && m_baseClass) {
+    if (hasPart(partID)) {
+        return m_parts.value(partID);
+    } else if (fallback && m_baseClass) {
         return m_baseClass->getPart(partID);
-    } else if (!hasPart(partID)) {
-        return nullptr;
     }
 
-    return m_parts.value(partID);
+    return nullptr;
 }
 
 QList<Part *> Class::parts() const
@@ -61,3 +63,5 @@ void Class::addPart(Part *part)
 }
 
 }
+
+#include "moc_class.cpp"

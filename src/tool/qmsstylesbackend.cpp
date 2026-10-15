@@ -30,7 +30,7 @@ void QmsstylesBackend::load(QString path)
     }
 
     m_currentStylePath = path;
-    m_currentStyle = Qmsstyles::self()->load(path, true);
+    m_currentStyle = Qmsstyles::self()->load(path, false);
     if (m_currentStyle) {
         m_currentStyleName = m_currentStyle->name();
 

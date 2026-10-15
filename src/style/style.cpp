@@ -25,12 +25,12 @@ namespace VisualStyle
 static const int s_propheaderSection = 4;
 static const int s_propheaderSize = s_propheaderSection * 8;
 
-Style::Style(const QString &name, const QString &path, const bool fakeStructure, QObject *parent)
+Style::Style(const QString &name, const QString &path, const bool readonly, QObject *parent)
     : QObject(parent)
     , m_invalid(false)
     , m_name(name)
     , m_path(path)
-    , m_fakeStructure(fakeStructure)
+    , m_readonly(readonly)
     , m_resourceTree(new wres::WinLibrary(path.toStdString()))
 {
     if (!(m_resourceTree->isLoaded() && m_resourceTree->isValid() && m_resourceTree->isPEBinary())) {
@@ -51,17 +51,22 @@ bool Style::invalid()
     return m_invalid;
 }
 
-QString Style::name()
+QString Style::name() const
 {
     return m_name;
 }
 
-QString Style::path()
+QString Style::path() const
 {
     return m_path;
 }
 
-Style::Version Style::version()
+bool Style::isReadonly() const
+{
+    return m_readonly;
+}
+
+Style::Version Style::version() const
 {
     return m_version;
 }
@@ -71,7 +76,7 @@ QList<Class *> &Style::classes()
     return m_classes;
 }
 
-int Style::classNameToIdx(QString name)
+int Style::idForClass(QString name)
 {
     auto it = std::find_if(m_classes.begin(), m_classes.end(), [&](Class *cls) {
         return cls->name().compare(name, Qt::CaseInsensitive) == 0;
@@ -100,7 +105,7 @@ Part *Style::getPart(int classID, int partID)
         return nullptr;
     }
 
-    return cls->getPart(partID);
+    return cls->getPart(partID, !m_readonly);
 }
 
 State *Style::getState(int classID, int partID, int stateID)
@@ -110,17 +115,90 @@ State *Style::getState(int classID, int partID, int stateID)
         return nullptr;
     }
 
-    return part->getState(stateID);
+    return part->getState(stateID, !m_readonly);
 }
 
 Property *Style::getProperty(int classID, int partID, int stateID, IDENTIFIER nameID)
 {
-    State *state = getState(classID, partID, stateID);
-    if (!state) {
-        return nullptr;
+    Property *property = nullptr;
+
+    if (!m_readonly) {
+        State *state = getState(classID, partID, stateID);
+        if (!state) {
+            return nullptr;
+        }
+
+        property = state->properties()->get(nameID, true);
+    } else {
+        Class *originalCls = getClass(classID);
+        if (!originalCls) {
+            return nullptr;
+        }
+
+        const Class *cls = originalCls;
+        int targetPartID = partID;
+        int targetStateID = stateID;
+
+        bool stop = false;
+        do {
+            Part *part = nullptr;
+            {
+                if (cls->hasPart(targetPartID)) {
+                    part = cls->getPart(targetPartID, false);
+                } else if (targetPartID != 0) {
+                    // look for common properties and restart the loop
+                    targetPartID = 0;
+                    continue;
+                } else if (cls->baseClass()) {
+                    cls = cls->baseClass();
+                    targetPartID = partID;
+                    continue;
+                }
+
+                if (!part) {
+                    stop = true;
+                    continue;
+                }
+            }
+
+            State *state = nullptr;
+            {
+                if (part->hasState(targetStateID)) {
+                    state = part->getState(targetStateID, false);
+                } else if (targetStateID != 0) {
+                    // look for common part and restart the loop
+                    targetStateID = 0;
+                    continue;
+                } else if (targetPartID != 0) {
+                    targetPartID = 0;
+                    targetStateID = stateID;
+                    continue;
+                } else if (cls->baseClass()) {
+                    cls = cls->baseClass();
+                    targetPartID = partID;
+                    targetStateID = stateID;
+                    continue;
+                }
+
+                if (!state) {
+                    stop = true;
+                    continue;
+                }
+            }
+
+            property = state->properties()->get(nameID, true);
+            if (!property && cls->baseClass()) {
+                targetPartID = partID;
+                targetStateID = stateID;
+                cls = cls->baseClass();
+                continue;
+            }
+
+            stop = true;
+        } while (!stop);
     }
 
-    return state->properties()->get(nameID);
+    return property;
 }
 
 bool Style::load()
@@ -135,11 +213,14 @@ bool Style::load()
     m_version = getVersion();
 
     loadBCMAP();
-    if (m_fakeStructure) {
+    if (!m_readonly) {
         structurize();
     }
     readPropertyHeaders();
-    handlePropertiesInheritance();
+    // if we're faking the structure then handle inheritance normally
+    if (!m_readonly) {
+        handlePropertiesInheritance();
+    }
 
     Q_EMIT loaded();
     return true;
@@ -182,7 +263,7 @@ void Style::loadCMAP()
         QStringList classes = cls->name().split("::");
         if (classes.length() > 1) {
             QString baseClass = classes.at(1);
-            int idx = classNameToIdx(baseClass);
+            int idx = idForClass(baseClass);
             if (idx == -1) {
                 qCCritical(QMSSTYLES_VISUALSTYLE_STYLE) << cls->name() << "attempting to inherit from non-existent class" << baseClass;
                 continue;
@@ -293,7 +374,7 @@ void Style::readPropertyHeaders()
             }
 
             Class *parentClass = getClass((qint32)classID);
-            if (!parentClass) {
+            if (!parentClass) { // this should be VERY unlikely
                 parentClass = new Class((qint32)classID, "Class");
                 m_classes.append(parentClass);
             }
@@ -524,26 +605,46 @@ void Style::interpretPropData(QByteArray data, quint32 resourceId, Property *pro
     }
 }
 
+// this is such a mess
 void Style::handlePropertiesInheritance()
 {
     for (VisualStyle::Class *cls : m_classes) {
         for (VisualStyle::Part *part : cls->parts()) {
             for (VisualStyle::State *state : part->states()) {
-                State *fallbackState = nullptr;
+
+                State *common = nullptr;
+                State *stateCommon = nullptr;
+                State *baseState = nullptr;
+
                 if (cls->name() != "globals" && part->id() == 0 && state->id() == 0) {
                     // globals -> Common Properties
-                    int globalsIdx = classNameToIdx("globals");
-                    fallbackState = getState(globalsIdx, 0, 0);
+                    int globalsIdx = idForClass("globals");
+                    common = getState(globalsIdx, 0, 0);
+                } else if (part->id() == 0 && state->id() != 0) {
+                    // Common Properties -> (Common/State)
+                    common = getState(cls->id(), 0, 0);
                 } else if (part->id() != 0 && state->id() == 0) {
                     // Common Properties -> Common
-                    fallbackState = getState(cls->id(), 0, 0);
+                    common = getState(cls->id(), 0, 0);
                 } else if (part->id() != 0 && state->id() != 0) {
-                    // Common -> state
-                    fallbackState = getState(cls->id(), part->id(), 0);
+                    // Common -> State
+                    common = getState(cls->id(), part->id(), 0);
+                    // (Common Properties/State) -> State
+                    stateCommon = getState(cls->id(), 0, state->id());
                 }
 
-                if (fallbackState) {
-                    state->properties()->setFallback(fallbackState->properties());
+                if (cls->baseClass()) {
+                    baseState = getState(cls->baseClass()->id(), part->id(), state->id());
+                }
+
+                if (common) {
+                    state->properties()->setSecondFallback(common->properties());
+                }
+                if (stateCommon) {
+                    state->properties()->setFirstFallback(stateCommon->properties());
+                }
+                if (baseState) {
+                    state->properties()->setThirdFallback(baseState->properties());
                 }
             }
         }

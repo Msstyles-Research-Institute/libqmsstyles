@@ -25,7 +25,8 @@ public:
 
     enum ItemRoles {
         IdRole,
-        NameRole
+        NameRole,
+        BaseNameRole,
     };
     Q_ENUM(ItemRoles)
 

@@ -29,6 +29,7 @@ This library depends on [LibWres](https://github.com/The-Evil-Ass-Fountain-Opene
 
 - [ ] Add a search bar to the msstyles tool
 - [ ] Add AMAP reading support (Windows 8+)
+- [ ] Improve the msstyles tool
 - [ ] Add editing support
     
     This leads to:

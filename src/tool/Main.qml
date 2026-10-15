@@ -248,7 +248,25 @@ Window {
                         clip: true
                         alternatingRows: false
                         interactive: false
-                        selectionModel: ItemSelectionModel {}
+                        selectionModel: ItemSelectionModel {
+                            onCurrentIndexChanged: {
+                                // https://doc.qt.io/qt-6/qmodelindex-and-related-classes-in-qml.html
+                                var index = currentIndex;
+                                while (index.parent.valid) {
+                                    index = index.parent;
+                                }
+
+                                var className = index.data(1);
+                                var baseClassName = index.data(2);
+
+                                inheritsText.text = "Class " + className + " ";
+                                if (baseClassName == "") {
+                                    inheritsText.text += "does not inherit from any class";
+                                } else {
+                                    inheritsText.text += "inherits from " + baseClassName;
+                                }
+                            }
+                        }
                         model: backend.structureModel
                         reuseItems: false
                         delegate: QQC2.TreeViewDelegate {
@@ -442,6 +460,11 @@ Window {
                 Text {
                     Layout.alignment: Qt.AlignVCenter
                     text: backend.structureModel.count + " classes"
+                }
+                SBSeparator {  }
+                Text {
+                    id: inheritsText
+                    Layout.alignment: Qt.AlignVCenter
                 }
                 SBSeparator {  }
                 Text {

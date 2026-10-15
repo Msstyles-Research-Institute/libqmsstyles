@@ -51,18 +51,19 @@ public:
 
     using Ptr = QSharedPointer<VisualStyle::Style>;
 
-    Style(const QString &name, const QString &path, const bool fakeStructure, QObject *parent = nullptr);
+    Style(const QString &name, const QString &path, const bool readonly, QObject *parent = nullptr);
     ~Style();
 
     bool invalid();
 
-    QString name();
-    QString path();
-    Version version();
+    QString name() const;
+    QString path() const;
+    bool isReadonly() const;
+    Version version() const;
 
     QList<Class *> &classes();
 
-    int classNameToIdx(QString name);
+    int idForClass(QString name);
 
     Class *getClass(int classID);
     Part *getPart(int classID, int partID);
@@ -101,7 +102,7 @@ private:
     QString m_path;
     Version m_version = Version::Windows7;
 
-    bool m_fakeStructure;
+    bool m_readonly;
     QList<Class *> m_classes;
 
     // pointer needed because of forward declaration

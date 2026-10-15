@@ -21,7 +21,7 @@ Qmsstyles *Qmsstyles::self()
     return s_instance;
 }
 
-QSharedPointer<VisualStyle::Style> Qmsstyles::load(const QString &path, const bool fakeStructure)
+QSharedPointer<VisualStyle::Style> Qmsstyles::load(const QString &path, const bool readonly)
 {
     VisualStyle::Style::Ptr style = get(path);
 
@@ -44,7 +44,8 @@ QSharedPointer<VisualStyle::Style> Qmsstyles::load(const QString &path, const bo
     }
 
     // otherwise, attempt to load it
-    style.reset(new VisualStyle::Style(info.baseName(), path, fakeStructure, this));
+    // FIXME: QFileInfo::baseName()
+    style.reset(new VisualStyle::Style(info.baseName(), path, readonly, this));
 
     // TODO: maybe return in what it failed also
     if (!style->invalid()) {

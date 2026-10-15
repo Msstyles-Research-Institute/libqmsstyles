@@ -30,17 +30,17 @@ bool Part::hasState(int stateID) const
 
 State *Part::getState(int stateID, bool fallback) const
 {
-    if (!hasState(stateID) && fallback && m_parentClass && m_parentClass->baseClass()) {
+    if (hasState(stateID)) {
+        return m_states.value(stateID);
+    } else if (!hasState(stateID) && fallback && m_parentClass && m_parentClass->baseClass()) {
         Part *otherPart = m_parentClass->baseClass()->getPart(m_id);
         Q_ASSERT(otherPart != this);
         if (otherPart) {
             return otherPart->getState(stateID);
         }
-    } else if (!hasState(stateID)) {
-        return nullptr;
     }
 
-    return m_states.value(stateID);
+    return nullptr;
 }
 
 QList<State *> Part::states()

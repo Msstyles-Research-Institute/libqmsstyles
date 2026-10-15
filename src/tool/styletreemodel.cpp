@@ -6,7 +6,7 @@
 
 StyleTreeModel::StyleTreeModel(QObject *parent)
     : QAbstractItemModel(parent)
-    , m_rootItem(std::make_unique<StyleTreeItem>(-1, "", 0, nullptr))
+    , m_rootItem(std::make_unique<StyleTreeItem>(-1, "", "", 0, nullptr))
 {
 }
 
@@ -25,6 +25,8 @@ QVariant StyleTreeModel::data(const QModelIndex &index, int role) const
         return item->id();
     case NameRole:
         return QString::number(item->id()) + " - " + item->name();
+    case BaseNameRole:
+        return item->baseName();
     }
 
     return {};
@@ -36,6 +38,7 @@ QHash<int, QByteArray> StyleTreeModel::roleNames() const
 
     names[IdRole] = "id";
     names[NameRole] = "display";
+    names[BaseNameRole] = "baseName";
 
     return names;
 }
@@ -116,7 +119,12 @@ void StyleTreeModel::instantiateItems()
 {
     beginInsertRows({}, 0, m_classArray.length() - 1);
     for (VisualStyle::Class *cls : m_classArray) {
-        StyleTreeItem *classItem = new StyleTreeItem(cls->id(), cls->name(), m_rootItem->childCount(), m_rootItem.get());
+        QString baseName;
+        if (cls->baseClass()) {
+            baseName = cls->baseClass()->name();
+        }
+
+        StyleTreeItem *classItem = new StyleTreeItem(cls->id(), cls->name(), baseName, m_rootItem->childCount(), m_rootItem.get());
         m_rootItem->addChildItem(classItem);
     }
     endInsertRows();
@@ -128,7 +136,7 @@ void StyleTreeModel::instantiateItems()
 
         beginInsertRows(classRoot, 0, cls->parts().length() - 1);
         for (VisualStyle::Part *part : cls->parts()) {
-            StyleTreeItem *partItem = new StyleTreeItem(part->id(), part->name(), classItem->childCount(), classItem);
+            StyleTreeItem *partItem = new StyleTreeItem(part->id(), part->name(), "", classItem->childCount(), classItem);
             classItem->addChildItem(partItem);
         }
         endInsertRows();
@@ -146,7 +154,7 @@ void StyleTreeModel::instantiateItems()
 
             beginInsertRows(partRoot, 0, part->states().length() - 1);
             for (VisualStyle::State *state : part->states()) {
-                StyleTreeItem *stateItem = new StyleTreeItem(state->id(), state->name(), partItem->childCount(), partItem);
+                StyleTreeItem *stateItem = new StyleTreeItem(state->id(), state->name(), "", partItem->childCount(), partItem);
                 partItem->addChildItem(stateItem);
             }
             endInsertRows();
