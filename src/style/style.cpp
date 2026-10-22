@@ -146,7 +146,7 @@ Property *Style::getProperty(int classID, int partID, int stateID, IDENTIFIER na
                 if (cls->hasPart(targetPartID)) {
                     part = cls->getPart(targetPartID, false);
                 } else if (targetPartID != 0) {
-                    // look for common properties and restart the loop
+                    // look for common properties part and restart the loop
                     targetPartID = 0;
                     continue;
                 } else if (cls->baseClass()) {
@@ -166,7 +166,7 @@ Property *Style::getProperty(int classID, int partID, int stateID, IDENTIFIER na
                 if (part->hasState(targetStateID)) {
                     state = part->getState(targetStateID, false);
                 } else if (targetStateID != 0) {
-                    // look for common part and restart the loop
+                    // look for common state and restart the loop
                     targetStateID = 0;
                     continue;
                 } else if (targetPartID != 0) {
@@ -187,11 +187,20 @@ Property *Style::getProperty(int classID, int partID, int stateID, IDENTIFIER na
             }
 
             property = state->properties()->get(nameID, true);
-            if (!property && cls->baseClass()) {
-                targetPartID = partID;
-                targetStateID = stateID;
-                cls = cls->baseClass();
-                continue;
+            if (!property) {
+                if (targetStateID == 0 && targetPartID != 0) {
+                    targetPartID = 0;
+                    targetStateID = stateID;
+                    continue;
+                } else if (targetPartID == 0 && targetStateID != 0) {
+                    targetStateID = 0;
+                    continue;
+                } else if (cls->baseClass()) {
+                    cls = cls->baseClass();
+                    targetPartID = partID;
+                    targetStateID = stateID;
+                    continue;
+                }
             }
 
             stop = true;
