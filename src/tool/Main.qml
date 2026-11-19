@@ -29,6 +29,7 @@ Window {
 
     QmsstylesBackend {
         id: backend
+        objectName: "backend"     // for access from C++
         imageFileItem: imageFileItem
         currentElement: treeView.selectionModel.currentIndex
     }
@@ -349,9 +350,8 @@ Window {
                         reuseItems: false
                         selectionMode: TableView.SingleSelection
                         editTriggers: TableView.DoubleTapped
-                        delegateModelAccess: DelegateModel.ReadWrite
                         columnSpacing: 1
-                        delegate: QQC2.TableViewDelegate {
+                        delegate: QQC2.ItemDelegate {
                             id: delegateRoot
 
                             implicitWidth: (TableView.view.width / 2) - 1
