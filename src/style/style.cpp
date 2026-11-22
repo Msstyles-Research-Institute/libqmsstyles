@@ -14,6 +14,7 @@
 #include <QtEndian>
 #include <QtLogging>
 #include <QLoggingCategory>
+#include <QHash>
 
 #include <wres/winlibrary.h>
 
@@ -24,6 +25,24 @@ namespace VisualStyle
 
 static const int s_propheaderSection = 4;
 static const int s_propheaderSize = s_propheaderSection * 8;
+
+struct PropertyIdentifier
+{
+    int classID;
+    int partID;
+    int stateID;
+    IDENTIFIER nameID;
+
+    friend bool operator==(const PropertyIdentifier &l, const PropertyIdentifier &r) noexcept
+    {
+        return l.classID == r.classID && l.partID == r.partID && l.stateID == r.stateID && l.nameID == r.nameID;
+    }
+
+    friend size_t qHash(const PropertyIdentifier &obj, size_t seed = 0) noexcept
+    {
+        return qHashMulti(seed, obj.classID, obj.partID, obj.stateID, obj.nameID);
+    }
+};
 
 Style::Style(const QString &name, const QString &path, const bool readonly, QObject *parent)
     : QObject(parent)
@@ -130,81 +149,90 @@ Property *Style::getProperty(int classID, int partID, int stateID, IDENTIFIER na
 
         property = state->properties()->get(nameID, true);
     } else {
-        Class *originalCls = getClass(classID);
-        if (!originalCls) {
-            return nullptr;
+        static QHash<PropertyIdentifier, Property *> s_cachedProperties;
+
+        PropertyIdentifier id{classID, partID, stateID, nameID};
+        if (s_cachedProperties.contains(id)) {
+            property = s_cachedProperties.find(id).value();
+        } else {
+            Class *originalCls = getClass(classID);
+            if (!originalCls) {
+                return nullptr;
+            }
+
+            const Class *cls = originalCls;
+            int targetPartID = partID;
+            int targetStateID = stateID;
+
+            bool stop = false;
+            do {
+                Part *part = nullptr;
+                {
+                    if (cls->hasPart(targetPartID)) {
+                        part = cls->getPart(targetPartID, false);
+                    } else if (targetPartID != 0) {
+                        // look for common properties part and restart the loop
+                        targetPartID = 0;
+                        continue;
+                    } else if (cls->baseClass()) {
+                        cls = cls->baseClass();
+                        targetPartID = partID;
+                        continue;
+                    }
+
+                    if (!part) {
+                        stop = true;
+                        continue;
+                    }
+                }
+
+                State *state = nullptr;
+                {
+                    if (part->hasState(targetStateID)) {
+                        state = part->getState(targetStateID, false);
+                    } else if (targetStateID != 0) {
+                        // look for common state and restart the loop
+                        targetStateID = 0;
+                        continue;
+                    } else if (targetPartID != 0) {
+                        targetPartID = 0;
+                        targetStateID = stateID;
+                        continue;
+                    } else if (cls->baseClass()) {
+                        cls = cls->baseClass();
+                        targetPartID = partID;
+                        targetStateID = stateID;
+                        continue;
+                    }
+
+                    if (!state) {
+                        stop = true;
+                        continue;
+                    }
+                }
+
+                property = state->properties()->get(nameID, true);
+                if (!property) {
+                    if (targetStateID == 0 && targetPartID != 0) {
+                        targetPartID = 0;
+                        targetStateID = stateID;
+                        continue;
+                    } else if (targetPartID == 0 && targetStateID != 0) {
+                        targetStateID = 0;
+                        continue;
+                    } else if (cls->baseClass()) {
+                        cls = cls->baseClass();
+                        targetPartID = partID;
+                        targetStateID = stateID;
+                        continue;
+                    }
+                }
+
+                stop = true;
+            } while (!stop);
+
+            s_cachedProperties.insert(id, property);
         }
-
-        const Class *cls = originalCls;
-        int targetPartID = partID;
-        int targetStateID = stateID;
-
-        bool stop = false;
-        do {
-            Part *part = nullptr;
-            {
-                if (cls->hasPart(targetPartID)) {
-                    part = cls->getPart(targetPartID, false);
-                } else if (targetPartID != 0) {
-                    // look for common properties part and restart the loop
-                    targetPartID = 0;
-                    continue;
-                } else if (cls->baseClass()) {
-                    cls = cls->baseClass();
-                    targetPartID = partID;
-                    continue;
-                }
-
-                if (!part) {
-                    stop = true;
-                    continue;
-                }
-            }
-
-            State *state = nullptr;
-            {
-                if (part->hasState(targetStateID)) {
-                    state = part->getState(targetStateID, false);
-                } else if (targetStateID != 0) {
-                    // look for common state and restart the loop
-                    targetStateID = 0;
-                    continue;
-                } else if (targetPartID != 0) {
-                    targetPartID = 0;
-                    targetStateID = stateID;
-                    continue;
-                } else if (cls->baseClass()) {
-                    cls = cls->baseClass();
-                    targetPartID = partID;
-                    targetStateID = stateID;
-                    continue;
-                }
-
-                if (!state) {
-                    stop = true;
-                    continue;
-                }
-            }
-
-            property = state->properties()->get(nameID, true);
-            if (!property) {
-                if (targetStateID == 0 && targetPartID != 0) {
-                    targetPartID = 0;
-                    targetStateID = stateID;
-                    continue;
-                } else if (targetPartID == 0 && targetStateID != 0) {
-                    targetStateID = 0;
-                    continue;
-                } else if (cls->baseClass()) {
-                    cls = cls->baseClass();
-                    targetPartID = partID;
-                    targetStateID = stateID;
-                    continue;
-                }
-            }
-
-            stop = true;
-        } while (!stop);
     }
 
     return property;

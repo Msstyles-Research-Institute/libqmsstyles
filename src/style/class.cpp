@@ -42,13 +42,12 @@ bool Class::hasPart(int partID) const
 
 Part *Class::getPart(int partID, bool fallback) const
 {
-    if (hasPart(partID)) {
-        return m_parts.value(partID);
-    } else if (fallback && m_baseClass) {
-        return m_baseClass->getPart(partID);
+    Part *part = m_parts.value(partID);
+    if (!part && fallback && m_baseClass) {
+        part = m_baseClass->getPart(partID);
     }
 
-    return nullptr;
+    return part;
 }
 
 QList<Part *> Class::parts() const

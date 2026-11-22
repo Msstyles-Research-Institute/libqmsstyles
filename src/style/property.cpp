@@ -69,12 +69,13 @@ bool PropertiesHandler::contains(IDENTIFIER nameID, bool fallback)
 
 Property *PropertiesHandler::get(IDENTIFIER nameID, bool fallback)
 {
-    auto it = std::find_if(m_properties.begin(), m_properties.end(), [&](Property *property) {
+    auto it = std::find_if(m_properties.cbegin(), m_properties.cend(), [&](Property *property) {
         return property->name() == nameID;
     });
 
     if (it != m_properties.end()) {
-        return *it;
+        const Property *prop = *it;
+        return m_properties.at(m_properties.indexOf(prop));
     } else if (fallback) {
         if (m_firstFallback && m_firstFallback->contains(nameID)) {
             // States set in Common Properties
