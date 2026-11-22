@@ -97,15 +97,26 @@ QList<Class *> &Style::classes()
 
 int Style::idForClass(QString name)
 {
-    auto it = std::find_if(m_classes.begin(), m_classes.end(), [&](Class *cls) {
-        return cls->name().compare(name, Qt::CaseInsensitive) == 0;
-    });
+    static QHash<QString, int> s_cachedIds;
 
-    if (it != m_classes.end()) {
-        return (*it)->id();
+    int id = -1;
+    if (m_readonly && s_cachedIds.contains(name)) {
+        id = s_cachedIds.find(name).value();
     } else {
-        return -1;
+        auto it = std::find_if(m_classes.begin(), m_classes.end(), [&](Class *cls) {
+            return cls->name().compare(name, Qt::CaseInsensitive) == 0;
+        });
+
+        if (it != m_classes.end()) {
+            id = (*it)->id();
+        }
+
+        if (m_readonly) {
+            s_cachedIds.insert(name, id);
+        }
     }
+
+    return id;
 }
 
 Class *Style::getClass(int classID)
