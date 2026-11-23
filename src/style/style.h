@@ -73,6 +73,8 @@ public:
     bool load();
     bool save();
 
+    QByteArray headerlessDibToBmp(QByteArray data) const;
+
 Q_SIGNALS:
     void loaded();
     void saved();

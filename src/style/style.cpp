@@ -282,11 +282,38 @@ bool Style::save()
         return false;
     }
 
+    if (m_readonly) {
+        qCWarning(QMSSTYLES_VISUALSTYLE_STYLE) << "Attempted to save a read-only msstyles";
+        return false;
+    }
+
     saveCMAP();
     saveProperties();
 
     Q_EMIT saved();
     return true;
+}
+
+QByteArray Style::headerlessDibToBmp(QByteArray data) const
+{
+    int headerSize = qFromLittleEndian<int>(data.sliced(0, 4).constData());
+
+    QByteArray bmpData;
+    bmpData.reserve(14 + data.size());
+
+    QDataStream stream(&bmpData, QIODeviceBase::ReadWrite);
+    stream.setByteOrder(QDataStream::LittleEndian);
+
+    // BITMAPFILEHEADER
+    stream.writeRawData("BM", 2);
+    stream << quint32(14 + data.size());
+    stream << quint16(0);
+    stream << quint16(0);
+    stream << quint32(14 + headerSize);
+
+    bmpData.append(data);
+
+    return bmpData;
 }
 
 void Style::loadCMAP()
@@ -358,9 +385,9 @@ void Style::loadBCMAP()
 void Style::structurize()
 {
     // don't bother
-    if (m_version == Version::WindowsLonghorn) {
-        return;
-    }
+    // if (m_version == Version::WindowsLonghorn) {
+    //     return;
+    // }
 
     for (Class *cls : m_classes) {
         auto visualParts = VisualPartsMap::find(cls->name(), m_version);
@@ -381,7 +408,7 @@ void Style::structurize()
 void Style::readPropertyHeaders()
 {
     auto readProperties = [&](QString type, QString name) {
-        wres::WinResource res = m_resourceTree->findResource(type.toStdString(), name.toStdString(), "")->children().at(0);;
+        wres::WinResource res = m_resourceTree->findResource(type.toStdString(), name.toStdString(), "")->children().at(0);
         QByteArray data(res.offset(), res.size());
 
         int offset = 0;
@@ -522,27 +549,36 @@ void Style::interpretPropData(QByteArray data, quint32 resourceId, Property *pro
         }
 
         wres::WinResource imageRes = m_resourceTree->findResource(groupName.toStdString(), std::to_string(resourceId), "")->children().at(0);
-        QByteArrayView imageData(imageRes.offset(), imageRes.size());
+        QByteArray imageData(imageRes.offset(), imageRes.size());
+        if (m_version == Version::WindowsLonghorn) {
+            imageData = headerlessDibToBmp(imageData);
+        }
 
         QImage image;
-        image.loadFromData(imageData);
+        image.loadFromData(imageData, fileType.toUtf8().constData());
         if (image.isNull()) {
             break;
         }
 
         if (m_version != Version::WindowsLonghorn) {
             image.reinterpretAsFormat(QImage::Format_ARGB32_Premultiplied);
+        } else {
+            image.convertTo(QImage::Format_ARGB32_Premultiplied);
         }
 
         property->setImageFile(QPixmap::fromImage(image));
         break;
     }
 
+    // TODO: DISKSTREAM isn't limited to only images.
     case IDENTIFIER::DISKSTREAM: {
         property->setValue(resourceId);
 
         wres::WinResource streamRes = m_resourceTree->findResource("STREAM", std::to_string(resourceId), "")->children().at(0);
-        QByteArrayView imageData(streamRes.offset(), streamRes.size());
+        QByteArray imageData(streamRes.offset(), streamRes.size());
+        /*if (m_version == Version::WindowsLonghorn) {
+            imageData = headerlessDibToBmp(imageData);
+        }*/
 
         QString fileType;
         if (m_version == Version::WindowsLonghorn) {
@@ -552,7 +588,7 @@ void Style::interpretPropData(QByteArray data, quint32 resourceId, Property *pro
         }
 
         QImage image;
-        image.loadFromData(imageData);
+        image.loadFromData(imageData, fileType.toUtf8().constData());
         if (image.isNull()) {
             break;
         }
