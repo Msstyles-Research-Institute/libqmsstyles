@@ -8,15 +8,6 @@
 #include <QUrl>
 #include <QHash>
 
-// for some reason including wres library directly causes for the
-// C++ compiler to think QObject is part of wres, and causes a ton
-// more issues depending if it's included before or after QObject.
-// I suck at C++ so there might be a way better fix, who knows.
-namespace wres
-{
-class WinLibrary;
-}
-
 namespace VisualStyle
 {
 Q_NAMESPACE
@@ -26,6 +17,7 @@ class Part;
 class State;
 class Property;
 
+class StylePrivate;
 class Style : public QObject
 {
     Q_OBJECT
@@ -39,6 +31,7 @@ class Style : public QObject
     Q_PROPERTY(QList<Class *> classes READ classes NOTIFY loaded)
 public:
     enum Version {
+        Unknown = -1,
         WindowsXP = 0,
         WindowsLonghorn,
         WindowsVista,
@@ -73,8 +66,6 @@ public:
     bool load();
     bool save();
 
-    QByteArray headerlessDibToBmp(QByteArray data) const;
-
 Q_SIGNALS:
     void loaded();
     void saved();
@@ -86,29 +77,8 @@ Q_SIGNALS:
     void versionChanged(VisualStyle::Style::Version version);
 
 private:
-    void loadCMAP();
-    void loadBCMAP();
-    void structurize();
-    void readPropertyHeaders();
-    void interpretPropData(QByteArray data, quint32 unknown1, Property *property);
-    void handlePropertiesInheritance();
-
-    void saveCMAP();
-    void saveProperties();
-
-    Version getVersion();
-
-    bool m_invalid;
-
-    QString m_name;
-    QString m_path;
-    Version m_version = Version::Windows7;
-
-    bool m_readonly;
-    QList<Class *> m_classes;
-
-    // pointer needed because of forward declaration
-    wres::WinLibrary *m_resourceTree;
+    std::unique_ptr<StylePrivate> d;
+    friend class StylePrivate;
 };
 
 }

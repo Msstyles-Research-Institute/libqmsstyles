@@ -351,7 +351,7 @@ Window {
                         selectionMode: TableView.SingleSelection
                         editTriggers: TableView.DoubleTapped
                         columnSpacing: 1
-                        delegate: QQC2.ItemDelegate {
+                        delegate: QQC2.TableViewDelegate {
                             id: delegateRoot
 
                             implicitWidth: (TableView.view.width / 2) - 1
