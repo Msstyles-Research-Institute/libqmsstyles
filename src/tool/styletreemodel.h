@@ -39,7 +39,7 @@ public:
 
     int count() const; // QML
 
-    void setClassArray(QList<VisualStyle::Class *> &classArray);
+    void setClassArray(const QList<VisualStyle::Class *> &classArray);
 
 Q_SIGNALS:
     void classArrayChanged();

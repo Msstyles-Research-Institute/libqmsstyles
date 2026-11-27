@@ -103,7 +103,7 @@ int StyleTreeModel::count() const
     return rowCount();
 }
 
-void StyleTreeModel::setClassArray(QList<VisualStyle::Class *> &classArray)
+void StyleTreeModel::setClassArray(const QList<VisualStyle::Class *> &classArray)
 {
     beginRemoveRows({}, 0, m_rootItem->childCount() - 1);
     m_rootItem->clearChildItems();

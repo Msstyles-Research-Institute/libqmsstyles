@@ -213,7 +213,7 @@ public:
         return property;
     }
 
-    QByteArray headerlessDibToBmp(QByteArray data) const
+    QByteArray headerlessDibToBmp(QByteArray data, QList<quint8> *pixelAlpha = nullptr) const
     {
         int headerSize = qFromLittleEndian<int>(data.sliced(0, 4).constData());
 
@@ -231,6 +231,14 @@ public:
         stream << quint32(14 + headerSize);
 
         bmpData.append(data);
+
+        if (pixelAlpha) {
+            int offset = 14 + headerSize;
+            while (offset + 4 < bmpData.size()) {
+                pixelAlpha->append(qFromLittleEndian<quint8>(bmpData.sliced(offset, sizeof(quint8))));
+                offset += sizeof(quint32);
+            }
+        }
 
         return bmpData;
     }
@@ -323,9 +331,33 @@ public:
         }
     }
 
-    // TODO: optimize this somehow
+    void loadVMAP()
+    {
+        wres::WinResource res = resourceTree.findResource("VMAP", "VMAP", "")->children().at(0);
+        QByteArray data = QByteArray(res.offset(), res.size());
+
+        int offset = 0;
+        while (offset < data.size()) {
+            quint32 stringSize = qFromLittleEndian<quint32>(data.sliced(offset, 4).constData());
+
+            int dataSize = sizeof(quint32) + stringSize * 2;
+            int padding = qCeil((qreal)dataSize / 4.0) * 4 - dataSize;
+            int nextOffset = offset + dataSize + padding;
+
+            offset += sizeof(quint32);
+            QString variantName;
+            for (int i = 0; i < stringSize * 2; i += 2) {
+                variantName.append(data.sliced(offset + i, 1).constData());
+            }
+
+            variants.append(variantName);
+            offset = nextOffset;
+        }
+    }
+
     void readPropertyHeaders()
     {
+        // TODO: optimize this somehow
         auto readProperties = [&](QString type, QString name) {
             wres::WinResource res = resourceTree.findResource(type.toStdString(), name.toStdString(), "")->children().at(0);
             QByteArray data(res.offset(), res.size());
@@ -399,14 +431,8 @@ public:
         // documentation crap or something
         readProperties("RMAP", "RMAP");
 
-        // TODO: read from other variants if available too
-        QString resourceName;
-        if (version == Style::Version::WindowsLonghorn) {
-            resourceName = "NORMALDEFAULT";
-        } else {
-            resourceName = "NORMAL";
-        }
-        readProperties("VARIANT", resourceName);
+        // element properties
+        readProperties("VARIANT", variants.first().toUpper());
     }
 
     // TODO: and this
@@ -468,8 +494,10 @@ public:
 
                 wres::WinResource imageRes = resourceTree.findResource(groupName.toStdString(), std::to_string(resourceId), "")->children().at(0);
                 QByteArray imageData(imageRes.offset(), imageRes.size());
+
+                QList<quint8> pixelAlpha;
                 if (version == Style::Version::WindowsLonghorn) {
-                    imageData = headerlessDibToBmp(imageData);
+                    imageData = headerlessDibToBmp(imageData, &pixelAlpha);
                 }
 
                 QImage image;
@@ -478,10 +506,26 @@ public:
                     break;
                 }
 
-                if (version != Style::Version::WindowsLonghorn) {
-                    image.reinterpretAsFormat(QImage::Format_ARGB32_Premultiplied);
-                } else {
+                if (version == Style::Version::WindowsLonghorn) {
+                    image.reinterpretAsFormat(QImage::Format_ARGB32);
+                    image.flip(Qt::Vertical);
+
+                    int i = 0;
+                    for (int y = 0; y < image.height(); y++) {
+                        QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+                        for (int x = 0; x < image.width(); x++) {
+                            if (i < pixelAlpha.size()) {
+                                QColor color(line[x]);
+                                color.setAlpha(pixelAlpha[i++]);
+                                line[x] = color.rgba();
+                            }
+                        }
+                    }
+
+                    image.flip(Qt::Vertical);
                     image.convertTo(QImage::Format_ARGB32_Premultiplied);
+                } else {
+                    image.reinterpretAsFormat(QImage::Format_ARGB32_Premultiplied);
                 }
 
                 property->setImageFile(QPixmap::fromImage(image));
@@ -818,7 +862,7 @@ public:
         bool foundW8Taskband = false;
         bool foundVistaQueryBuilder = false;
         bool foundTaskBand2Light_Taskband2 = false;
-        bool foundTravelFwd_AnimationButton = false;
+        bool foundWizard05_Static = false;
 
         for (Class *cls : classes) {
             if (cls->name() == "DWMTouch") {
@@ -831,8 +875,8 @@ public:
                 foundVistaQueryBuilder = true;
             } else if (cls->name() == "DarkMode::TaskManager") {
                 foundTaskBand2Light_Taskband2 = true;
-            } else if (cls->name() == "TravelFwd::AnimationButton") {
-                foundTravelFwd_AnimationButton = true;
+            } else if (cls->name() == "Wizard05::Static" || cls->name() == "Wizard05Wizard::BackButton") {
+                foundWizard05_Static = true;
             }
         }
 
@@ -844,7 +888,7 @@ public:
             return Style::Version::Windows10;
         } else if (foundVistaQueryBuilder) {
             return Style::Version::WindowsVista;
-        } else if (foundTravelFwd_AnimationButton) {
+        } else if (foundWizard05_Static) {
             return Style::Version::WindowsLonghorn;
         } else {
             return Style::Version::Windows7;
@@ -859,6 +903,7 @@ public:
 
     bool readonly;
     QList<Class *> classes;
+    QList<QString> variants;
 
     wres::WinLibrary resourceTree;
 
@@ -903,9 +948,14 @@ Style::Version Style::version() const
     return d->version;
 }
 
-QList<Class *> &Style::classes()
+const QList<Class *> &Style::classes() const
 {
     return d->classes;
+}
+
+const QList<QString> &Style::variants() const
+{
+    return d->variants;
 }
 
 int Style::idForClass(QString name)
@@ -948,6 +998,7 @@ bool Style::load()
     if (!d->readonly) {
         d->structurize();
     }
+    d->loadVMAP();
     d->readPropertyHeaders();
     // if we're faking the structure then handle inheritance normally
     if (!d->readonly) {

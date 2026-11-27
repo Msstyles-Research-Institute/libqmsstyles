@@ -54,7 +54,8 @@ public:
     bool isReadonly() const;
     Version version() const;
 
-    QList<Class *> &classes();
+    const QList<Class *> &classes() const;
+    const QList<QString> &variants() const;
 
     int idForClass(QString name);
 

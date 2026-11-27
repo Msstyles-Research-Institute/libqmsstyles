@@ -47,7 +47,9 @@ The following table shows the offset, size and description of each section in th
 
 Variants map.
 
-Stores the name of every variant available in the visual style.
+Stores the name of every variant available in the visual style. 
+
+The first 4 bytes indicate the size of the string that follows. The next string is spaced out by a minimum of 4 bytes. Each string will always have its size as 4 bytes before it.
 
 ### RMAP
 
@@ -55,11 +57,13 @@ Root map.
 
 Contains visual style metadata such as name, display name, description, company, author, etc.
 
-In `aero.msstyles`, only name and last updated date are set. Name and tooltip also repeat twice in that order specifically after last updated date.
+In `aero.msstyles`, only name and last updated date are set. Name and tooltip also repeat twice in that order specifically after last updated date (could it be that RMAP also stores the metadata for each variant?).
 
 ### PACKTHEM_VERSION
 
 The version of the official Microsoft msstyles packaging tool used to package the msstyles file.
+
+This can be used to determine the format of the msstyles data.
 
 XP's version is 0x0300 (3). Longhorn and later's version is 0x0400 (4).
 
