@@ -233,9 +233,9 @@ public:
         bmpData.append(data);
 
         if (pixelAlpha) {
-            int offset = 14 + headerSize;
-            while (offset + 4 < bmpData.size()) {
-                pixelAlpha->append(qFromLittleEndian<quint8>(bmpData.sliced(offset, sizeof(quint8))));
+            int offset = headerSize;
+            while (offset < data.size()) {
+                pixelAlpha->append(qFromLittleEndian<quint8>(data.sliced(offset, sizeof(quint8))));
                 offset += sizeof(quint32);
             }
         }
